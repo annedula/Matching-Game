@@ -1,0 +1,187 @@
+:root {
+  --bg: #ffeff6;
+  --card-bg: #fff;
+  --accent: #ff7ecf;
+  --accent-2: #ffd56b;
+  --shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  --card-size: 96px;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: "Poppins", Arial, sans-serif;
+  background: linear-gradient(135deg, var(--bg), #fff7ea);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 28px;
+  color: #333;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 12px;
+}
+h1 {
+  margin: 6px 0 0 0;
+  font-size: 28px;
+  letter-spacing: 0.4px;
+  color: #3b2a3a;
+}
+.topbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 0 20px;
+}
+.pill {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: white;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+#controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+button {
+  border: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+#undoBtn {
+  background: #fff;
+  color: #ff6aa6;
+}
+
+#game {
+  width: 420px;
+  display: grid;
+  grid-template-columns: repeat(4, var(--card-size));
+  grid-auto-rows: var(--card-size);
+  gap: 12px;
+  perspective: 1000px;
+  margin-top: 8px;
+}
+
+.card {
+  width: var(--card-size);
+  height: var(--card-size);
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 400ms;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(60, 20, 60, 0.08);
+}
+
+.card.flipped {
+  transform: rotateY(180deg);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  backface-visibility: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+}
+
+.front {
+  background: linear-gradient(180deg, #ffffff, #fff0f6);
+  transform: rotateY(180deg);
+  overflow: hidden;
+}
+
+.back {
+  background: linear-gradient(135deg, #ffecf7, #fff5ea);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back .cover {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff6aa6, #ffb86b);
+  border-radius: 12px;
+}
+
+.front img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  filter: drop-shadow(0 6px 10px rgba(255, 120, 160, 0.18));
+}
+
+.hud {
+  margin-top: 16px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.hud .box {
+  background: #fff;
+  padding: 8px 12px;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  font-weight: 600;
+}
+
+/* modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.36);
+}
+.modal.show {
+  display: flex;
+}
+.dialog {
+  background: #fff;
+  padding: 22px;
+  width: 360px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+}
+.dialog h2 {
+  margin: 0 0 8px 0;
+}
+.dialog p {
+  margin: 8px 0 16px 0;
+  color: #666;
+}
+
+/* responsive */
+@media (max-width: 480px) {
+  #game {
+    transform: scale(0.88);
+    transform-origin: center;
+  }
+}

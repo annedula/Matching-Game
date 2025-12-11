@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Memory Match</title>
+  </head>
+  <body>
+    <header>
+      <div class="topbar">
+        <div class="pill">Memory Match Game by Rosemarie Pearl</div>
+        <link rel="stylesheet" href="style.css" />
+      </div>
+      <h1>Find all matching pairs!</h1>
+    </header>
+
+    <div id="controls">
+      <button id="restartBtn">Restart</button>
+      <button id="undoBtn">Undo</button>
+    </div>
+
+    <div class="hud">
+      <div class="box">Score: <span id="score">0</span></div>
+      <div class="box">Pairs: <span id="pairs">0</span>/8</div>
+      <div class="box">Time: <span id="timer">01:30</span></div>
+    </div>
+
+    <div id="game"></div>
+
+    <!-- win/lose modal -->
+    <div id="modal" class="modal">
+      <div class="dialog">
+        <h2 id="modalTitle">You Won!</h2>
+        <p id="modalText">
+          Great job. Time left: <span id="timeLeftText">--</span>
+        </p>
+        <button id="playAgain">Play Again</button>
+      </div>
+    </div>
+
+    <script>
+      // IMAGE FILES — update names if needed
+      const imageFiles = [
+        "img1.png",
+        "img2.png",
+        "img3.png",
+        "img4.png",
+        "img5.png",
+        "img6.png",
+        "img7.png",
+        "img8.png",
+      ];
+
+      const totalCards = 16;
+      const countdownSeconds = 90; // 90s countdown
+
+      // create card elements
+      const gameDiv = document.getElementById("game");
+      for (let i = 0; i < totalCards; i++) {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.dataset.index = i;
+        card.innerHTML = `
+      <div class="face back"><div class="cover">?</div></div>
+      <div class="face front"><img src="" alt="img"></div>
+    `;
+        card.onclick = () => onCardClick(i);
+        gameDiv.appendChild(card);
+      }
+
+      // wasm Module will call startGame on ready
+      var Module = {
+        onRuntimeInitialized: function () {
+          Module._initGame();
+          setupUI();
+        },
+      };
+
+      // load the wasm glue (game.js produced by emcc)
+      const script = document.createElement("script");
+      script.src = "game.js";
+      document.body.appendChild(script);
+
+      // helper to format time
+      function formatTime(s) {
+        const mm = Math.floor(s / 60)
+          .toString()
+          .padStart(2, "0");
+        const ss = (s % 60).toString().padStart(2, "0");
+        return `${mm}:${ss}`;
+      }
+
+      // UI state refresh from wasm
+      function refreshUI() {
+        const score = Module.ccall("getScore", "number", [], []);
+        const pairs = Module.ccall("getMatchedCount", "number", [], []);
+        document.getElementById("score").innerText = score;
+        document.getElementById("pairs").innerText = pairs;
+
+        for (let i = 0; i < totalCards; i++) {
+          const faceVal = Module.ccall(
+            "getCardValue",
+            "number",
+            ["number"],
+            [i]
+          );
+          const cardEl = gameDiv.children[i];
+          const imgEl = cardEl.querySelector(".front img");
+
+          if (faceVal !== -1) {
+            // revealed or matched — show image
+            imgEl.src = getImageForValue(faceVal);
+            cardEl.classList.add("flipped");
+          } else {
+            // hidden
+            cardEl.classList.remove("flipped");
+            imgEl.src = ""; // hide
+          }
+
+          // if matched, keep flipped permanently
+          const matched = Module.ccall("isMatched", "number", ["number"], [i]);
+          if (matched) cardEl.classList.add("flipped");
+        }
+
+        // check win
+        const win = Module.ccall("isWin", "number", [], []);
+        if (win) {
+          showModal(true);
+        }
+      }
+
+      // map card numeric value to file path
+      function getImageForValue(val) {
+        // val expected 1..8
+        const idx = val - 1;
+        if (idx >= 0 && idx < imageFiles.length) return imageFiles[idx];
+        // fallback emoji as data url could be later, but we return a transparent placeholder.
+        return "";
+      }
+
+      // when user clicks a card
+      let lock = false; // lock while waiting timeout
+      function onCardClick(i) {
+        if (lock) return;
+        Module.ccall("flipCard", "number", ["number"], [i]);
+        refreshUI();
+
+        // check how many currently face-up and not matched
+        let revealedNow = [];
+        for (let j = 0; j < totalCards; j++) {
+          const v = Module.ccall("getCardValue", "number", ["number"], [j]);
+          const m = Module.ccall("isMatched", "number", ["number"], [j]);
+          if (v !== -1 && !m) revealedNow.push(j);
+        }
+
+        // If two revealed unmatched — flip back after 1s
+        if (revealedNow.length === 2) {
+          const [a, b] = revealedNow;
+          // if they match the isMatched flag will be set; but we check:
+          const matchedA = Module.ccall("isMatched", "number", ["number"], [a]);
+          const matchedB = Module.ccall("isMatched", "number", ["number"], [b]);
+          if (matchedA && matchedB) {
+            // matched — update score
+            refreshUI();
+            return;
+          }
+          // not matched -> schedule hide
+          lock = true;
+          setTimeout(() => {
+            Module.ccall("hideLastTwo", "void", [], []);
+            lock = false;
+            refreshUI();
+          }, 900);
+        }
+      }
+
+      // Undo
+      document.getElementById("undoBtn").onclick = () => {
+        Module.ccall("undo", "void", [], []);
+        refreshUI();
+      };
+
+      // Restart / Play again
+      document.getElementById("restartBtn").onclick = () => {
+        Module.ccall("initGame", "void", [], []);
+        resetTimer();
+        refreshUI();
+      };
+      document.getElementById("playAgain").onclick = () => {
+        document.getElementById("modal").classList.remove("show");
+        Module.ccall("initGame", "void", [], []);
+        resetTimer();
+        refreshUI();
+      };
+
+      // Modal show
+      function showModal(didWin) {
+        const modal = document.getElementById("modal");
+        modal.classList.add("show");
+        document.getElementById("modalTitle").innerText = didWin
+          ? "You Won!"
+          : "Time's up!";
+        document.getElementById("modalText").innerHTML = didWin
+          ? "Great job. Time left: <b id='timeLeftText'></b>"
+          : "Try again next time.";
+        if (didWin) {
+          // show time left
+          const left = remainingSeconds;
+          document.getElementById("timeLeftText").innerText = formatTime(left);
+        }
+      }
+
+      // Timer (countdown)
+      let timerInterval = null;
+      let remainingSeconds = countdownSeconds;
+      function startTimer() {
+        clearInterval(timerInterval);
+        remainingSeconds = countdownSeconds;
+        document.getElementById("timer").innerText =
+          formatTime(remainingSeconds);
+        timerInterval = setInterval(() => {
+          remainingSeconds--;
+          document.getElementById("timer").innerText =
+            formatTime(remainingSeconds);
+          if (remainingSeconds <= 0) {
+            clearInterval(timerInterval);
+            // stop game and show lose modal
+            showModal(false);
+          }
+        }, 1000);
+      }
+      function resetTimer() {
+        startTimer();
+      }
+
+      function setupUI() {
+        // populate front images after game init (we ask wasm for each value)
+        for (let i = 0; i < totalCards; i++) {
+          const imgEl = gameDiv.children[i].querySelector(".front img");
+          // value assigned in initGame, but we will refreshUI to set src
+        }
+        startTimer();
+        refreshUI();
+      }
+    </script>
+    <script src="game.js"></script>
+  </body>
+</html>
